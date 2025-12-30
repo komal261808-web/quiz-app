@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Java Quiz - Exam Mode</title>
+
+<style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f5f5f5;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 15px;
+}
+
+.quiz-box {
+    background: #ffffff;
+    width: 100%;
+    max-width: 600px;
+    border: 1px solid #ccc;
+    padding: 20px;
+}
+
+/* Header */
+.header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.timer {
+    color: #b00020;
+}
+
+/* Progress */
+.progress {
+    height: 6px;
+    background: #ddd;
+    margin-bottom: 15px;
+}
+
+.progress-bar {
+    height: 100%;
+    width: 0%;
+    background: #000;
+}
+
+/* Question */
+.question {
+    font-size: 16px;
+    margin-bottom: 15px;
+    font-weight: bold;
+}
+
+/* Options */
+.option {
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    font-size: 15px;
+}
+
+.option:hover {
+    background: #f0f0f0;
+}
+
+.option.selected {
+    background: #e3f2fd;
+    border-color: #1565c0;
+}
+
+/* Buttons */
+.buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+}
+
+button {
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    border: 1px solid #000;
+    background: #fff;
+}
+
+button:hover {
+    background: #eee;
+}
+
+/* Result */
+#result {
+    display: none;
+    text-align: center;
+}
+
+/* Popup */
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.4);
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+.popup {
+    background: #fff;
+    width: 90%;
+    max-width: 350px;
+    padding: 20px;
+    border: 1px solid #000;
+    text-align: center;
+}
+
+.popup p {
+    margin-bottom: 20px;
+    font-size: 15px;
+}
+
+.popup button {
+    margin: 0 5px;
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+    .question {
+        font-size: 15px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="quiz-box">
+
+    <div class="header">
+        <div>Java Quiz (Exam)</div>
+        <div class="timer">Time Left: <span id="time">05:00</span></div>
+    </div>
+
+    <div class="progress">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div id="quiz">
+        <div class="question" id="question"></div>
+        <div id="options"></div>
+
+        <div class="buttons">
+            <button onclick="prevQuestion()">Previous</button>
+            <button onclick="nextQuestion()">Next</button>
+            <button onclick="openSubmitPopup()">Submit Exam</button>
+        </div>
+    </div>
+
+    <div id="result">
+        <h2>Result</h2>
+        <p>Your Score: <strong><span id="score"></span>/5</strong></p>
+        <p>High Score: <strong><span id="highScore"></span></strong></p>
+        <button onclick="restartQuiz()">Restart Test</button>
+    </div>
+
+</div>
+
+<!-- Submit Confirmation Popup -->
+<div class="popup-overlay" id="popup">
+    <div class="popup">
+        <p>Are you sure you want to submit the exam?</p>
+        <button onclick="confirmSubmit()">Yes</button>
+        <button onclick="closeSubmitPopup()">No</button>
+    </div>
+</div>
+
+<script>
+/* CONFIGURATION */
+const TOTAL_EXAM_TIME = 5 * 60;
+
+/* QUESTIONS */
+const quizData = [
+    {
+        question: "Which of the following is the correct file extension for Java files?",
+        options: ["A. .java", "B. .jav", "C. .class", "D. .js"],
+        answer: 0
+    },
+    {
+        question: "Which method is the entry point of a Java program?",
+        options: ["A. start()", "B. main()", "C. run()", "D. init()"],
+        answer: 1
+    },
+    {
+        question: "Which keyword is used to inherit a class in Java?",
+        options: ["A. this", "B. super", "C. extends", "D. implements"],
+        answer: 2
+    },
+    {
+        question: "Which of these is NOT a primitive data type in Java?",
+        options: ["A. int", "B. boolean", "C. String", "D. double"],
+        answer: 2
+    },
+    {
+        question: "Which company originally developed Java?",
+        options: ["A. Microsoft", "B. Apple", "C. Sun Microsystems", "D. Google"],
+        answer: 2
+    }
+];
+
+let currentQuestion = 0;
+let selectedAnswers = [];
+let examTimeLeft = TOTAL_EXAM_TIME;
+let examTimer;
+
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const timeEl = document.getElementById("time");
+const progressBar = document.getElementById("progressBar");
+const popup = document.getElementById("popup");
+
+startExamTimer();
+loadQuestion();
+
+function startExamTimer() {
+    examTimer = setInterval(() => {
+        examTimeLeft--;
+
+        let m = Math.floor(examTimeLeft / 60);
+        let s = examTimeLeft % 60;
+
+        timeEl.textContent =
+            String(m).padStart(2,"0") + ":" +
+            String(s).padStart(2,"0");
+
+        if (examTimeLeft === 0) {
+            showResult();
+        }
+    }, 1000);
+}
+
+function loadQuestion() {
+    progressBar.style.width =
+        ((currentQuestion + 1) / quizData.length) * 100 + "%";
+
+    questionEl.textContent = quizData[currentQuestion].question;
+    optionsEl.innerHTML = "";
+
+    quizData[currentQuestion].options.forEach((opt, index) => {
+        const div = document.createElement("div");
+        div.className = "option";
+        div.textContent = opt;
+
+        if (selectedAnswers[currentQuestion] === index) {
+            div.classList.add("selected");
+        }
+
+        div.onclick = () => selectOption(index);
+        optionsEl.appendChild(div);
+    });
+}
+
+function selectOption(index) {
+    selectedAnswers[currentQuestion] = index;
+    document.querySelectorAll(".option").forEach(o =>
+        o.classList.remove("selected")
+    );
+    optionsEl.children[index].classList.add("selected");
+}
+
+function nextQuestion() {
+    if (currentQuestion < quizData.length - 1) {
+        currentQuestion++;
+        loadQuestion();
+    }
+}
+
+function prevQuestion() {
+    if (currentQuestion > 0) {
+        currentQuestion--;
+        loadQuestion();
+    }
+}
+
+/* Popup Functions */
+function openSubmitPopup() {
+    popup.style.display = "flex";
+}
+
+function closeSubmitPopup() {
+    popup.style.display = "none";
+}
+
+function confirmSubmit() {
+    popup.style.display = "none";
+    showResult();
+}
+
+function showResult() {
+    clearInterval(examTimer);
+    document.getElementById("quiz").style.display = "none";
+    document.getElementById("result").style.display = "block";
+
+    let score = 0;
+    quizData.forEach((q, i) => {
+        if (selectedAnswers[i] === q.answer) score++;
+    });
+
+    document.getElementById("score").textContent = score;
+
+    let highScore = localStorage.getItem("javaExamHighScore") || 0;
+    if (score > highScore) {
+        localStorage.setItem("javaExamHighScore", score);
+        highScore = score;
+    }
+
+    document.getElementById("highScore").textContent = highScore;
+}
+
+function restartQuiz() {
+    currentQuestion = 0;
+    selectedAnswers = [];
+    examTimeLeft = TOTAL_EXAM_TIME;
+    document.getElementById("quiz").style.display = "block";
+    document.getElementById("result").style.display = "none";
+    startExamTimer();
+    loadQuestion();
+}
+</script>
+
+</body>
+</html>
+
+
